@@ -1,282 +1,293 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>3D Hand Tracking - Vite + Three.js + MediaPipe</title>
-    <style>
-        /* ===== GLOBAL CSS RESET ===== */
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            touch-action: none;
-            -webkit-touch-callout: none;
-            -webkit-user-select: none;
-            user-select: none;
-        }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Emil Gasarayev | 3D Hand Tracking</title>
+  <meta name="description"
+    content="Emil Gasarayev tərəfindən MediaPipe və Three.js istifadə edilərək hazırlanan interaktiv 3D əl izləmə layihəsi.">
 
-        html {
-            width: 100vw;
-            height: 100vh;
-            overflow: hidden;
-        }
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://alhamdulillah-theta.vercel.app/">
+  <meta property="og:title" content="Emil Gasarayev - 3D Hand Tracking Experience">
+  <meta property="og:description"
+    content="Barmaq hərəkətləri ilə 3D dünyanı idarə edin. Gələcəyin interfeysini kəşf edin.">
+  <meta property="og:image" content="https://alhamdulillah-theta.vercel.app/emil.png">
 
-        body {
-            width: 100vw;
-            height: 100vh;
-            overflow: hidden;
-            position: fixed;
-            margin: 0;
-            padding: 0;
-            background: #000;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-        }
+  <meta property="twitter:card" content="summary_large_image">
+  <meta property="twitter:title" content="Emil Gasarayev - 3D Hand Tracking">
+  <meta property="twitter:image" content="https://alhamdulillah-theta.vercel.app/emil.png">
+  <style>
+    /* ===== GLOBAL CSS RESET ===== */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      touch-action: none;
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      user-select: none;
+    }
 
-        /* ===== THREE.JS CANVAS CONTAINER ===== */
-        #app {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100vw;
-            height: 100vh;
-            overflow: hidden;
-        }
+    html {
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+    }
 
-        /* ===== WEBCAM VIDEO ===== */
-        #video {
-            position: fixed;
-            top: 8px;
-            right: 8px;
-            width: 120px;
-            height: auto;
-            max-height: 25vh;
-            border: 2px solid #00ffff;
-            border-radius: 6px;
-            transform: scaleX(-1);
-            z-index: 10;
-            box-shadow: 0 0 12px rgba(0, 255, 255, 0.5);
-            background: #000;
-            pointer-events: none;
-        }
+    body {
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      position: fixed;
+      margin: 0;
+      padding: 0;
+      background: #000;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
 
-        @media (max-width: 480px) {
-            #video {
-                width: 100px;
-                top: 6px;
-                right: 6px;
-            }
-        }
+    /* ===== THREE.JS CANVAS CONTAINER ===== */
+    #app {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+    }
 
-        /* ===== UI OVERLAYS ===== */
-        .ui {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-            z-index: 100;
-        }
+    /* ===== WEBCAM VIDEO ===== */
+    #video {
+      position: fixed;
+      top: 8px;
+      right: 8px;
+      width: 120px;
+      height: auto;
+      max-height: 25vh;
+      border: 2px solid #00ffff;
+      border-radius: 6px;
+      transform: scaleX(-1);
+      z-index: 10;
+      box-shadow: 0 0 12px rgba(0, 255, 255, 0.5);
+      background: #000;
+      pointer-events: none;
+    }
 
-        /* ===== STATUS/DEBUG BOX (TOP-LEFT) ===== */
-        .stats {
-            position: fixed;
-            top: 8px;
-            left: 8px;
-            background: rgba(0, 0, 0, 0.9);
-            border: 1px solid rgba(0, 255, 255, 0.4);
-            border-radius: 6px;
-            padding: 8px 12px;
-            color: #00ffff;
-            font-family: 'Courier New', monospace;
-            font-size: 10px;
-            line-height: 1.5;
-            min-width: 110px;
-            max-width: 180px;
-            pointer-events: none;
-            z-index: 9;
-        }
+    @media (max-width: 480px) {
+      #video {
+        width: 100px;
+        top: 6px;
+        right: 6px;
+      }
+    }
 
-        .stat-label {
-            color: #0099ff;
-            display: inline;
-            margin-right: 6px;
-        }
+    /* ===== UI OVERLAYS ===== */
+    .ui {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 100;
+    }
 
-        .stat-value {
-            color: #00ffff;
-            font-weight: bold;
-        }
+    /* ===== STATUS/DEBUG BOX (TOP-LEFT) ===== */
+    .stats {
+      position: fixed;
+      top: 8px;
+      left: 8px;
+      background: rgba(0, 0, 0, 0.9);
+      border: 1px solid rgba(0, 255, 255, 0.4);
+      border-radius: 6px;
+      padding: 8px 12px;
+      color: #00ffff;
+      font-family: 'Courier New', monospace;
+      font-size: 10px;
+      line-height: 1.5;
+      min-width: 110px;
+      max-width: 180px;
+      pointer-events: none;
+      z-index: 9;
+    }
 
-        /* ===== CONTROL PANEL (BOTTOM) ===== */
-        .control-panel {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background: rgba(0, 0, 0, 0.95);
-            border-top: 2px solid rgba(0, 255, 255, 0.3);
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            padding: 12px;
-            pointer-events: all;
-            z-index: 1000;
-        }
+    .stat-label {
+      color: #0099ff;
+      display: inline;
+      margin-right: 6px;
+    }
 
-        #start-btn {
-            padding: 16px 40px;
-            font-size: 15px;
-            font-weight: 700;
-            color: #000;
-            background: linear-gradient(135deg, #00ffff, #0099ff);
-            border: 2px solid #00ffff;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            box-shadow: 0 0 30px rgba(0, 255, 255, 0.4);
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            -webkit-tap-highlight-color: transparent;
-            min-height: 48px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 100%;
-        }
+    .stat-value {
+      color: #00ffff;
+      font-weight: bold;
+    }
 
-        #start-btn:active {
-            transform: scale(0.98);
-            box-shadow: 0 0 20px rgba(0, 255, 255, 0.6);
-        }
+    /* ===== CONTROL PANEL (BOTTOM) ===== */
+    .control-panel {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: rgba(0, 0, 0, 0.95);
+      border-top: 2px solid rgba(0, 255, 255, 0.3);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding: 12px;
+      pointer-events: all;
+      z-index: 1000;
+    }
 
-        #start-btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            box-shadow: none;
-        }
+    #start-btn {
+      padding: 16px 40px;
+      font-size: 15px;
+      font-weight: 700;
+      color: #000;
+      background: linear-gradient(135deg, #00ffff, #0099ff);
+      border: 2px solid #00ffff;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: 0 0 30px rgba(0, 255, 255, 0.4);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      -webkit-tap-highlight-color: transparent;
+      min-height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+    }
 
-        #stop-btn {
-            padding: 16px 40px;
-            font-size: 15px;
-            font-weight: 700;
-            color: #fff;
-            background: linear-gradient(135deg, #ff0055, #ff3366);
-            border: 2px solid #ff0055;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            box-shadow: 0 0 30px rgba(255, 0, 85, 0.4);
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            -webkit-tap-highlight-color: transparent;
-            min-height: 48px;
-            display: none;
-            width: 100%;
-            align-items: center;
-            justify-content: center;
-        }
+    #start-btn:active {
+      transform: scale(0.98);
+      box-shadow: 0 0 20px rgba(0, 255, 255, 0.6);
+    }
 
-        #stop-btn:active {
-            transform: scale(0.98);
-            box-shadow: 0 0 20px rgba(255, 0, 85, 0.6);
-        }
+    #start-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
 
-        #stop-btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
+    #stop-btn {
+      padding: 16px 40px;
+      font-size: 15px;
+      font-weight: 700;
+      color: #fff;
+      background: linear-gradient(135deg, #ff0055, #ff3366);
+      border: 2px solid #ff0055;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: 0 0 30px rgba(255, 0, 85, 0.4);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      -webkit-tap-highlight-color: transparent;
+      min-height: 48px;
+      display: none;
+      width: 100%;
+      align-items: center;
+      justify-content: center;
+    }
 
-        /* ===== STATUS MESSAGE ===== */
-        .status {
-            position: fixed;
-            bottom: 120px;
-            left: 50%;
-            transform: translateX(-50%);
-            padding: 8px 20px;
-            background: rgba(0, 0, 0, 0.9);
-            border: 1px solid #00ffff;
-            border-radius: 6px;
-            color: #00ffff;
-            font-size: 12px;
-            pointer-events: all;
-            z-index: 999;
-            text-align: center;
-        }
+    #stop-btn:active {
+      transform: scale(0.98);
+      box-shadow: 0 0 20px rgba(255, 0, 85, 0.6);
+    }
 
-        .status.error {
-            border-color: #ff0055;
-            color: #ff0055;
-        }
+    #stop-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
 
-        .status.loading {
-            border-color: #0099ff;
-            color: #0099ff;
-        }
+    /* ===== STATUS MESSAGE ===== */
+    .status {
+      position: fixed;
+      bottom: 120px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 8px 20px;
+      background: rgba(0, 0, 0, 0.9);
+      border: 1px solid #00ffff;
+      border-radius: 6px;
+      color: #00ffff;
+      font-size: 12px;
+      pointer-events: all;
+      z-index: 999;
+      text-align: center;
+    }
 
-        @media (max-width: 480px) {
-            .control-panel {
-                gap: 8px;
-                padding: 10px;
-            }
+    .status.error {
+      border-color: #ff0055;
+      color: #ff0055;
+    }
 
-            #start-btn,
-            #stop-btn {
-                padding: 14px 30px;
-                font-size: 14px;
-                min-height: 44px;
-            }
+    .status.loading {
+      border-color: #0099ff;
+      color: #0099ff;
+    }
 
-            .stats {
-                font-size: 9px;
-                padding: 6px 10px;
-            }
+    @media (max-width: 480px) {
+      .control-panel {
+        gap: 8px;
+        padding: 10px;
+      }
 
-            .status {
-                font-size: 11px;
-                padding: 6px 16px;
-                bottom: 110px;
-            }
-        }
-    </style>
+      #start-btn,
+      #stop-btn {
+        padding: 14px 30px;
+        font-size: 14px;
+        min-height: 44px;
+      }
+
+      .stats {
+        font-size: 9px;
+        padding: 6px 10px;
+      }
+
+      .status {
+        font-size: 11px;
+        padding: 6px 16px;
+        bottom: 110px;
+      }
+    }
+  </style>
 </head>
+
 <body>
-    <!-- Three.js Canvas Container (FULL SCREEN) -->
-    <div id="app"></div>
-    
-    <!-- Webcam Feed (Top-Right) -->
-    <video 
-        id="video" 
-        autoplay 
-        playsinline 
-        muted
-        style="display: block;">
-    </video>
+  <!-- Three.js Canvas Container (FULL SCREEN) -->
+  <div id="app"></div>
 
-    <!-- UI Overlays -->
-    <div class="ui">
-        <!-- Stats/Debug Info (Top-Left) -->
-        <div class="stats">
-            <div><span class="stat-label">FPS:</span><span class="stat-value" id="stat-fps">0</span></div>
-            <div><span class="stat-label">Hands:</span><span class="stat-value" id="stat-hands">0</span></div>
-            <div><span class="stat-label">X:</span><span class="stat-value" id="stat-x">0.0</span></div>
-            <div><span class="stat-label">Y:</span><span class="stat-value" id="stat-y">0.0</span></div>
-            <div><span class="stat-label">Z:</span><span class="stat-value" id="stat-z">0.0</span></div>
-        </div>
+  <!-- Webcam Feed (Top-Right) -->
+  <video id="video" autoplay playsinline muted style="display: block;">
+  </video>
 
-        <!-- Status Message -->
-        <div class="status" id="status">Ready. Click START CAMERA 👆</div>
-
-        <!-- Control Panel (Bottom) -->
-        <div class="control-panel">
-            <button id="start-btn">▶ START CAMERA</button>
-            <button id="stop-btn">⏹ STOP CAMERA</button>
-        </div>
+  <!-- UI Overlays -->
+  <div class="ui">
+    <!-- Stats/Debug Info (Top-Left) -->
+    <div class="stats">
+      <div><span class="stat-label">FPS:</span><span class="stat-value" id="stat-fps">0</span></div>
+      <div><span class="stat-label">Hands:</span><span class="stat-value" id="stat-hands">0</span></div>
+      <div><span class="stat-label">X:</span><span class="stat-value" id="stat-x">0.0</span></div>
+      <div><span class="stat-label">Y:</span><span class="stat-value" id="stat-y">0.0</span></div>
+      <div><span class="stat-label">Z:</span><span class="stat-value" id="stat-z">0.0</span></div>
     </div>
 
-    <script type="module" src="/src/main.js"></script>
+    <!-- Status Message -->
+    <div class="status" id="status">Ready. Click START CAMERA 👆</div>
+
+    <!-- Control Panel (Bottom) -->
+    <div class="control-panel">
+      <button id="start-btn">▶ START CAMERA</button>
+      <button id="stop-btn">⏹ STOP CAMERA</button>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
 </body>
+
 </html>
