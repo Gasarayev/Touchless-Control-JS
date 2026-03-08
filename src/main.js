@@ -7,7 +7,7 @@
  * ✓ Real-time hand landmark detection (21 points)
  * ✓ Smooth Lerp interpolation for jitter-free tracking
  * ✓ Visible mirrored webcam feed for debugging
- * ✓ 3D sphere following index finger tip
+ * ✓ 3D digit eight (glowing cursor) following index finger tip
  * ✓ Console logging for validation
  */
 
@@ -27,7 +27,7 @@ const CONFIG = {
 
 // ==================== STATE ====================
 let scene, camera, renderer;
-let sphere = null;
+let digitEight = null;           // 3D '8' digit (glowing cursor)
 let pointLight = null;
 let handLandmarker = null;
 let isRunning = false;
@@ -43,6 +43,8 @@ let heartParticles = null;
 let emojiGroup = null;           // Group of emoji sprites
 let emojiSprites = [];           // Array to track individual sprite data
 let congratulationsText = null;
+let digitEightMaterial = null;   // Material for the '8'
+let digitEightPulse = 0;         // For color pulsing animation
 let spherePos = { x: 0, y: 0, z: 0 };
 
 // Opacity control for smooth transitions
@@ -139,7 +141,7 @@ function initThreeJS() {
         0.1,
         2000
     );
-    // Center the camera - sphere starts centered on screen
+    // Center the camera - digit eight starts centered on screen
     // Dynamically adjust camera Z based on screen width (mobile: further back)
     const cameraPosZ = width < 768 ? 500 : 350;
     camera.position.set(0, 0, cameraPosZ);
@@ -174,8 +176,8 @@ function initThreeJS() {
     pointLight.castShadow = true;
     scene.add(pointLight);
 
-    // Create sphere (the glowing cursor)
-    createGlowingSphere();
+    // Create digit eight (the glowing cursor)
+    createGlowingDigitEight();
 
     // Create particle system for falling hearts/rain
     const particleGeometry = new THREE.BufferGeometry();
@@ -256,53 +258,66 @@ function initThreeJS() {
 }
 
 /**
- * Create the glowing wireframe sphere with spider-web effect
- * Mobile optimized: reduced geometry detail for better performance
+ * Create a glowing 3D '8' digit composed of two torus rings
+ * Mobile optimized with wireframe effect
  */
-function createGlowingSphere() {
-    // Optimized IcosahedronGeometry for mobile (subdivisions=4)
-    // High-detail version was 6, reduced to 4 for better mobile performance
-    const geometry = new THREE.IcosahedronGeometry(CONFIG.sphereRadius, 4);
+function createGlowingDigitEight() {
+    // Create parent group for the '8'
+    digitEight = new THREE.Group();
+    digitEight.position.set(0, 0, 0);
+    digitEight.scale.set(1, 1, 1);
 
-    // Material with wireframe for spider-web effect
-    wireframeMaterial = new THREE.MeshStandardMaterial({
+    // Material with wireframe for digital/cyber look
+    digitEightMaterial = new THREE.MeshStandardMaterial({
         color: 0x00CCFF,           // Light blue base
         emissive: 0x00CCFF,        // Light blue glow
         emissiveIntensity: 0.9,
         metalness: 0.8,
         roughness: 0.1,
-        wireframe: true,           // SPIDER-WEB EFFECT
+        wireframe: true,           // Digital/cyber effect
         wireframeLinewidth: 2
     });
 
-    sphere = new THREE.Mesh(geometry, wireframeMaterial);
-    sphere.castShadow = true;
-    sphere.receiveShadow = true;
-    sphere.position.set(0, 0, 0);
-    sphere.scale.set(1, 1, 1);
+    // Top ring (upper circle of '8')
+    const topGeometry = new THREE.TorusGeometry(15, 8, 16, 32);
+    const topRing = new THREE.Mesh(topGeometry, digitEightMaterial);
+    topRing.position.y = 15;
+    topRing.castShadow = true;
+    topRing.receiveShadow = true;
+    digitEight.add(topRing);
 
-    // Add solid overlay for more visual pop (semi-transparent)
-    const solidGeometry = new THREE.IcosahedronGeometry(CONFIG.sphereRadius - 2, 4);
-    overlayMaterial = new THREE.MeshStandardMaterial({
-        color: 0x00CCFF,           // Light blue overlay
+    // Bottom ring (lower circle of '8')
+    const bottomGeometry = new THREE.TorusGeometry(15, 8, 16, 32);
+    const bottomRing = new THREE.Mesh(bottomGeometry, digitEightMaterial);
+    bottomRing.position.y = -15;
+    bottomRing.castShadow = true;
+    bottomRing.receiveShadow = true;
+    digitEight.add(bottomRing);
+
+    // Add a solid overlay for glow effect
+    const topSolidGeometry = new THREE.TorusGeometry(14, 7, 16, 32);
+    const topSolidMaterial = new THREE.MeshStandardMaterial({
+        color: 0x00CCFF,
         emissive: 0x00CCFF,
         emissiveIntensity: 0.5,
         metalness: 0.4,
         roughness: 0.3,
         transparent: true,
-        opacity: 0.2,              // Subtle transparency initially
+        opacity: 0.2,
         wireframe: false
     });
+    const topSolid = new THREE.Mesh(topSolidGeometry, topSolidMaterial);
+    topSolid.position.y = 15;
+    digitEight.add(topSolid);
 
-    const solidMesh = new THREE.Mesh(solidGeometry, overlayMaterial);
-    solidMesh.castShadow = true;
+    const bottomSolidGeometry = new THREE.TorusGeometry(14, 7, 16, 32);
+    const bottomSolid = new THREE.Mesh(bottomSolidGeometry, topSolidMaterial);
+    bottomSolid.position.y = -15;
+    digitEight.add(bottomSolid);
 
-    const group = new THREE.Group();
-    group.add(sphere);
-    group.add(solidMesh);
-    scene.add(group);
+    scene.add(digitEight);
 
-    console.log('✓ Spider-web sphere created (neon green wireframe + cyan overlay)');
+    console.log('✓ Glowing 3D digit eight created (wireframe light blue with glow)');
 }
 
 function onWindowResize() {
@@ -401,25 +416,37 @@ function predict() {
 
             // ===== STATE 1: HAND CLOSED OR PARTIALLY OPEN (distance < threshold) =====
             if (distance < CONFIG.fullyOpenThreshold) {
-                // Show sphere, hide celebration effects
-                sphere.visible = true;
+                // Show digit eight, hide celebration effects
+                digitEight.visible = true;
                 targetEmojiOpacity = 0;
                 targetTextOpacity = 0;
 
-                // Scale sphere based on hand openness (distance * multiplier)
+                // Scale digit eight based on hand openness (distance * multiplier)
                 const targetScale = distance * CONFIG.scaleMultiplier;
-                sphere.parent.scale.lerp(new THREE.Vector3(targetScale, targetScale, targetScale), 0.1);
+                digitEight.scale.lerp(new THREE.Vector3(targetScale, targetScale, targetScale), 0.1);
 
-                // Move sphere to follow index finger
-                sphere.parent.position.x += (targetX - sphere.parent.position.x) * 0.2;
-                sphere.parent.position.y += (targetY - sphere.parent.position.y) * 0.2;
+                // Move digit eight to follow index finger
+                digitEight.position.x += (targetX - digitEight.position.x) * 0.2;
+                digitEight.position.y += (targetY - digitEight.position.y) * 0.2;
+
+                // Rotate digit eight continuously
+                digitEight.rotation.y += 0.05;
+                digitEight.rotation.x += 0.02;
+
+                // Pulse color between light blue and white
+                digitEightPulse += 0.05;
+                const hue = Math.sin(digitEightPulse) * 0.5 + 0.5;  // Range: 0 to 1
+                const colorValue = Math.floor(lerp(0xCCFFFF, 0xFFFFFF, hue) * hue + 0x00CCFF * (1 - hue));
+                const pulseColor = new THREE.Color(0x00CCFF).lerp(new THREE.Color(0xFFFFFF), hue);
+                digitEightMaterial.color.copy(pulseColor);
+                digitEightMaterial.emissive.copy(pulseColor);
 
                 handsDetected = 1;
             }
             // ===== STATE 2: HAND FULLY OPEN (distance >= threshold) =====
             else {
-                // Hide sphere, show celebration effects
-                sphere.visible = false;
+                // Hide digit eight, show celebration effects
+                digitEight.visible = false;
                 emojiGroup.visible = true;  // Explicitly show emoji group
                 targetEmojiOpacity = 1.0;
                 targetTextOpacity = 1.0;
@@ -495,9 +522,9 @@ function predict() {
 
     // Stats box removed - logo now displays in top-left
 
-    // Update light to follow sphere
-    if (pointLight && sphere && sphere.parent) {
-        pointLight.position.copy(sphere.parent.position);
+    // Update light to follow digit eight
+    if (pointLight && digitEight) {
+        pointLight.position.copy(digitEight.position);
     }
 
     // Render scene
@@ -637,9 +664,9 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('📱 Device:', isMobile ? 'Mobile (optimized performance)' : 'Desktop');
     console.log('📹 Click START CAMERA to begin');
     console.log('🎯 GPU acceleration enabled');
-    console.log('✋ Follow your index finger - sphere tracks cursor position');
-    console.log('✌️  Pinch thumb+index to shrink/grow sphere (spider-web effect)');
-    console.log('🕸️  Watch the neon-green wireframe respond to pinch gestures');
+    console.log('✋ Follow your index finger - digit eight tracks cursor position');
+    console.log('✌️  Pinch thumb+index to shrink/grow digit eight (wireframe effect)');
+    console.log('🌐 Watch the light blue wireframe rotate and pulse with color');
     
     document.getElementById('start-btn').addEventListener('click', startTracking);
     document.getElementById('stop-btn').addEventListener('click', stopTracking);
