@@ -96,33 +96,24 @@
     }
 
     /* ===== STATUS/DEBUG BOX (TOP-LEFT) ===== */
-    .stats {
+    /* ===== COMPANY LOGO ===== */
+    #logo {
       position: fixed;
       top: 8px;
       left: 8px;
-      background: rgba(0, 0, 0, 0.9);
-      border: 1px solid rgba(0, 255, 255, 0.4);
-      border-radius: 6px;
-      padding: 8px 12px;
-      color: #00ffff;
-      font-family: 'Courier New', monospace;
-      font-size: 10px;
-      line-height: 1.5;
-      min-width: 110px;
-      max-width: 180px;
-      pointer-events: none;
+      width: 80px;
+      height: auto;
       z-index: 9;
+      pointer-events: none;
+      filter: drop-shadow(0 0 8px rgba(0, 255, 255, 0.3));
     }
 
-    .stat-label {
-      color: #0099ff;
-      display: inline;
-      margin-right: 6px;
-    }
-
-    .stat-value {
-      color: #00ffff;
-      font-weight: bold;
+    @media (max-width: 480px) {
+      #logo {
+        width: 60px;
+        top: 6px;
+        left: 6px;
+      }
     }
 
     /* ===== CONTROL PANEL (BOTTOM) ===== */
@@ -307,22 +298,16 @@
 
   <!-- UI Overlays -->
   <div class="ui">
-    <!-- Stats/Debug Info (Top-Left) -->
-    <div class="stats">
-      <div><span class="stat-label">FPS:</span><span class="stat-value" id="stat-fps">0</span></div>
-      <div><span class="stat-label">Hands:</span><span class="stat-value" id="stat-hands">0</span></div>
-      <div><span class="stat-label">X:</span><span class="stat-value" id="stat-x">0.0</span></div>
-      <div><span class="stat-label">Y:</span><span class="stat-value" id="stat-y">0.0</span></div>
-      <div><span class="stat-label">Z:</span><span class="stat-value" id="stat-z">0.0</span></div>
-    </div>
+    <!-- Company Logo (Top-Left) -->
+    <img id="logo" src="/logo.png" alt="Logo" style="display: block;">
 
     <!-- Status Message -->
-    <div class="status" id="status">Ready. Click START CAMERA 👆</div>
+    <div class="status" id="status">Hazır. KAMERANI BAŞLAT düyməsinə klik edin 👆</div>
 
     <!-- Control Panel (Bottom) -->
     <div class="control-panel">
-      <button id="start-btn">▶ START CAMERA</button>
-      <button id="stop-btn">⏹ STOP CAMERA</button>
+      <button id="start-btn">▶ KAMERANI BAŞLAT</button>
+      <button id="stop-btn">⏹ DAYANDIR</button>
     </div>
   </div>
 

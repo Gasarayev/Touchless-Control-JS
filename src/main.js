@@ -266,8 +266,8 @@ function createGlowingSphere() {
 
     // Material with wireframe for spider-web effect
     wireframeMaterial = new THREE.MeshStandardMaterial({
-        color: 0x00ff00,           // Neon green base
-        emissive: 0x00ff00,        // Neon green glow
+        color: 0x00CCFF,           // Light blue base
+        emissive: 0x00CCFF,        // Light blue glow
         emissiveIntensity: 0.9,
         metalness: 0.8,
         roughness: 0.1,
@@ -284,8 +284,8 @@ function createGlowingSphere() {
     // Add solid overlay for more visual pop (semi-transparent)
     const solidGeometry = new THREE.IcosahedronGeometry(CONFIG.sphereRadius - 2, 4);
     overlayMaterial = new THREE.MeshStandardMaterial({
-        color: 0x00ffff,           // Cyan overlay
-        emissive: 0x00ffff,
+        color: 0x00CCFF,           // Light blue overlay
+        emissive: 0x00CCFF,
         emissiveIntensity: 0.5,
         metalness: 0.4,
         roughness: 0.3,
@@ -493,8 +493,7 @@ function predict() {
         lastFrameTime = now;
     }
 
-    document.getElementById('stat-fps').textContent = fps;
-    document.getElementById('stat-hands').textContent = handsDetected;
+    // Stats box removed - logo now displays in top-left
 
     // Update light to follow sphere
     if (pointLight && sphere && sphere.parent) {
@@ -564,7 +563,7 @@ async function startTracking() {
         document.getElementById('start-btn').disabled = true;
         document.getElementById('stop-btn').style.display = 'block';
 
-        setStatus('Tracking active ✓', 'info');
+        setStatus('İzləmə aktivdir ✓', 'info');
         console.log('✓ Tracking started - watch the console for hand detection logs');
 
         // Start prediction/animation loop
@@ -622,7 +621,7 @@ function stopTracking() {
     // Reset UI
     document.getElementById('start-btn').disabled = false;
     document.getElementById('stop-btn').style.display = 'none';
-    setStatus('Camera stopped', 'info');
+    setStatus('Kamera dayandırıldı', 'info');
 
     console.log('✓ Tracking stopped');
 }
