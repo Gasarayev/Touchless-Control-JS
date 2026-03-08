@@ -255,6 +255,45 @@
         bottom: 110px;
       }
     }
+
+    /* ===== CELEBRATION TEXT OVERLAY ===== */
+    #celebration-text {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 90%;
+      font-size: 8vw;
+      font-weight: 900;
+      color: #000000;
+      text-shadow: 
+        0 0 10px #ff0000,
+        0 0 20px #ff0000,
+        0 0 40px #ff0000,
+        0 0 80px #ff0000;
+      z-index: 9999;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+      text-align: center;
+      font-family: 'Georgia', serif;
+      letter-spacing: 2px;
+      white-space: nowrap;
+    }
+
+    @media (max-width: 768px) {
+      #celebration-text {
+        font-size: 7vw;
+        letter-spacing: 1px;
+      }
+    }
+
+    @media (max-width: 480px) {
+      #celebration-text {
+        font-size: 6vw;
+        letter-spacing: 0px;
+      }
+    }
   </style>
 </head>
 

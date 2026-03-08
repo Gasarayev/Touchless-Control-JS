@@ -16,13 +16,13 @@ import { HandLandmarker, FilesetResolver } from '@mediapipe/tasks-vision';
 
 // ==================== CONFIG ====================
 const CONFIG = {
-    lerpFactor: 0.1,           // Slightly slower for more dramatic effect
+    lerpFactor: 0.1,
     sphereRadius: 25,
     depthScale: 150,
-    // Pinch-to-scale config
-    scaleMultiplier: 40,       // Large multiplier for bigger scale differences
-    scaleMin: 0.2,             // Tiny point when fully pinched
-    scaleMax: 15,              // Massive, screen-filling when fully spread
+    scaleMultiplier: 45,       // Scale sphere size based on hand openness
+    particleCount: 500,        // Number of falling particle dots
+    fullyOpenThreshold: 0.35,  // Hand fully open threshold (lower = easier to trigger)
+    emojiSpriteCount: 100      // Number of emoji sprites
 };
 
 // ==================== STATE ====================
@@ -38,12 +38,18 @@ let lastVideoTime = -1;
 let wireframeMaterial = null;
 let overlayMaterial = null;
 
+// Particle system
+let heartParticles = null;
+let emojiGroup = null;           // Group of emoji sprites
+let emojiSprites = [];           // Array to track individual sprite data
+let congratulationsText = null;
 let spherePos = { x: 0, y: 0, z: 0 };
-let targetPos = { x: 0, y: 0, z: 0 };
 
-// Scale tracking (for pinch gesture)
-let sphereScale = 1.0;
-let targetScale = 1.0;
+// Opacity control for smooth transitions
+let emojiOpacity = 0;
+let textOpacity = 0;
+let targetEmojiOpacity = 0;
+let targetTextOpacity = 0;
 
 // Stats
 let frameCount = 0;
@@ -61,6 +67,7 @@ let lastConfidence = 0;
 function lerp(current, target, factor) {
     return current + (target - current) * factor;
 }
+
 
 /**
  * Map MediaPipe coordinates (0-1) to Three.js world space
@@ -91,6 +98,31 @@ function calculateDepth(wrist, finger) {
     return Math.sqrt(dx * dx + dy * dy + (dz + 0.5) * (dz + 0.5));
 }
 
+/**
+ * Create a canvas texture with an emoji drawn on it
+ */
+function createEmojiTexture(emoji) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 128;
+    canvas.height = 128;
+    const ctx = canvas.getContext('2d');
+
+    // Clear background
+    ctx.fillStyle = 'rgba(0, 0, 0, 0)';
+    ctx.fillRect(0, 0, 128, 128);
+
+    // Draw emoji
+    ctx.font = 'bold 100px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(emoji, 64, 64);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.magFilter = THREE.LinearFilter;
+    texture.minFilter = THREE.LinearFilter;
+    return texture;
+}
+
 // ==================== THREE.JS INITIALIZATION ====================
 
 function initThreeJS() {
@@ -108,7 +140,9 @@ function initThreeJS() {
         2000
     );
     // Center the camera - sphere starts centered on screen
-    camera.position.set(0, 0, 350);
+    // Dynamically adjust camera Z based on screen width (mobile: further back)
+    const cameraPosZ = width < 768 ? 500 : 350;
+    camera.position.set(0, 0, cameraPosZ);
     camera.lookAt(0, 0, 0);
 
     // Create renderer with full viewport
@@ -119,8 +153,9 @@ function initThreeJS() {
     });
     
     // Set size to match viewport exactly
+    renderer.autoClear = true;
     renderer.setSize(width, height);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Cap at 2x for mobile performance
+    renderer.setPixelRatio(window.devicePixelRatio); // Use full device pixel ratio for sharp graphics
     renderer.shadowMap.enabled = true;
     renderer.domElement.style.position = 'fixed';
     renderer.domElement.style.top = '0';
@@ -141,6 +176,77 @@ function initThreeJS() {
 
     // Create sphere (the glowing cursor)
     createGlowingSphere();
+
+    // Create particle system for falling hearts/rain
+    const particleGeometry = new THREE.BufferGeometry();
+    const positions = new Float32Array(CONFIG.particleCount * 3);
+
+    for (let i = 0; i < CONFIG.particleCount * 3; i++) {
+        positions[i] = (Math.random() - 0.5) * 10;
+    }
+    particleGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+    const pMaterial = new THREE.PointsMaterial({
+        color: 0xff0000,
+        size: 0.1,
+        transparent: true,
+        opacity: 0
+    });
+
+    heartParticles = new THREE.Points(particleGeometry, pMaterial);
+    scene.add(heartParticles);
+
+    // Create emoji sprites for celebration (8 March)
+    const emojis = ['❤️', '💖', '💝', '💓', '💘'];
+    emojiGroup = new THREE.Group();
+    emojiSprites = [];
+
+    // Create 100 emoji sprites scattered across screen
+    for (let i = 0; i < CONFIG.emojiSpriteCount; i++) {
+        // Pick random emoji
+        const emoji = emojis[Math.floor(Math.random() * emojis.length)];
+        const texture = createEmojiTexture(emoji);
+
+        // Create sprite with emoji texture
+        const spriteMaterial = new THREE.SpriteMaterial({
+            map: texture,
+            transparent: true,
+            opacity: 0,
+            depthWrite: false,
+            depthTest: false  // Always visible, don't test depth
+        });
+
+        const sprite = new THREE.Sprite(spriteMaterial);
+
+        // Random position across full screen
+        sprite.position.x = (Math.random() - 0.5) * 400;
+        sprite.position.y = (Math.random() - 0.5) * 300;
+        sprite.position.z = Math.random() * 200;  // Range: 0 to 200 (in front of camera at Z=350/500)
+
+        // Responsive scale based on viewport size
+        const emojiScale = Math.min(window.innerWidth, window.innerHeight) * 0.05;
+        sprite.scale.set(emojiScale, emojiScale, 1);
+
+        emojiGroup.add(sprite);
+        emojiSprites.push({
+            sprite: sprite,
+            velocityY: -0.5 - Math.random() * 1,  // Falling speed
+            velocityX: (Math.random() - 0.5) * 0.5,
+            rotation: 0,
+            rotationSpeed: (Math.random() - 0.5) * 0.05
+        });
+    }
+
+    emojiGroup.position.set(0, 0, 0);
+    emojiGroup.visible = false;
+    scene.add(emojiGroup);
+
+    // Create HTML-based celebration text overlay
+    const textOverlay = document.createElement('div');
+    textOverlay.id = 'celebration-text';
+    textOverlay.textContent = 'Bayramınız Mübarək!💖';
+    document.body.appendChild(textOverlay);
+    congratulationsText = textOverlay;
 
     // Handle window resize
     window.addEventListener('resize', onWindowResize);
@@ -203,13 +309,23 @@ function onWindowResize() {
     const width = window.innerWidth;
     const height = window.innerHeight;
     
-    // Update camera
+    // Update camera aspect ratio
     camera.aspect = width / height;
     camera.updateProjectionMatrix();
     
-    // Update renderer
+    // Dynamically adjust camera Z based on screen width (mobile: further back)
+    const cameraPosZ = width < 768 ? 500 : 350;
+    camera.position.z = cameraPosZ;
+    
+    // Update renderer size and pixel ratio
     renderer.setSize(width, height);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setPixelRatio(window.devicePixelRatio);
+    
+    // Rescale emoji sprites to match new viewport
+    const emojiScale = Math.min(width, height) * 0.05;
+    for (let spriteData of emojiSprites) {
+        spriteData.sprite.scale.set(emojiScale, emojiScale, 1);
+    }
     
     console.log('✓ Window resized:', width, 'x', height, '(DPR:', window.devicePixelRatio.toFixed(1) + ')');
 }
@@ -251,136 +367,126 @@ async function initMediaPipe() {
  * Process hand detection results from HandLandmarker
  */
 function processHandResults(results) {
-    if (!results.landmarks || results.landmarks.length === 0) {
-        if (handsDetected > 0) {
-            console.log('Hand lost');
-        }
-        handsDetected = 0;
-        lastConfidence = 0;
-        return;
-    }
-
-    // Track first hand (index 0)
-    handsDetected = results.landmarks.length;
-    const landmarks = results.landmarks[0]; // Get first hand's landmarks
-
-    if (!landmarks || landmarks.length < 21) {
-        console.warn('Incomplete landmarks:', landmarks ? landmarks.length : 0);
-        return;
-    }
-
-    // Landmark 8 = Index Finger Tip (cursor position)
-    const indexTip = landmarks[8];
-    const wrist = landmarks[0];
-    const middleFinger = landmarks[9];
-    
-    // Landmark 4 = Thumb Tip (for pinch detection)
-    const thumbTip = landmarks[4];
-
-    // Calculate confidence from presence score
-    const presence = (indexTip.presence || 0.5);
-    lastConfidence = Math.round(presence * 100);
-
-    // ===== PINCH DETECTION (Thumb to Index distance) =====
-    // Calculate Euclidean distance between thumb tip and index tip
-    const pinchDistX = indexTip.x - thumbTip.x;
-    const pinchDistY = indexTip.y - thumbTip.y;
-    const pinchDistZ = (indexTip.z || 0) - (thumbTip.z || 0);
-    
-    const pinchDistance = Math.sqrt(
-        pinchDistX * pinchDistX + 
-        pinchDistY * pinchDistY + 
-        pinchDistZ * pinchDistZ
-    );
-
-    // Map pinch distance to scale using multiplier
-    // Distance * multiplier gives us the scale
-    let calculatedScale = pinchDistance * CONFIG.scaleMultiplier;
-    
-    // Clamp between min and max
-    targetScale = Math.min(Math.max(calculatedScale, CONFIG.scaleMin), CONFIG.scaleMax);
-
-    // ===== DEPTH CALCULATION (Average Z of all landmarks) =====
-    // Calculate average Z position of hand landmarks for depth
-    let sumZ = 0;
-    for (let i = 0; i < landmarks.length; i++) {
-        sumZ += (landmarks[i].z || 0);
-    }
-    const avgZ = sumZ / landmarks.length;
-
-    frameCounter++;
-
-    // DEBUG: Log hand data
-    console.log('Hand detected:', handsDetected);
-    console.log('  Index Tip (raw):', {
-        x: indexTip.x.toFixed(3),
-        y: indexTip.y.toFixed(3),
-        z: indexTip.z.toFixed(3)
-    });
-
-    // Map to 3D coordinates
-    targetPos = mapCoordinates(indexTip.x, indexTip.y, avgZ);
-
-    // DEBUG: Log mapped coordinates and scale
-    console.log('  Index Tip (mapped):', {
-        x: targetPos.x.toFixed(1),
-        y: targetPos.y.toFixed(1),
-        z: targetPos.z.toFixed(1)
-    });
-    console.log('  Pinch Distance:', pinchDistance.toFixed(3), '→ Calculated Scale:', calculatedScale.toFixed(2), '→ Clamped:', targetScale.toFixed(2));
+    // This function is no longer used - prediction is done in the predict() function instead
 }
 
 // ==================== ANIMATION LOOP ====================
 
 /**
- * Update sphere position and scale with smooth LERP interpolation
+ * Main prediction/render loop - continuous animation with hand detection
  */
-function updateSphere() {
-    if (!sphere) return;
+function predict() {
+    if (!isRunning) return;
 
-    // ===== POSITION: Apply LERP smoothing =====
-    spherePos.x = lerp(spherePos.x, targetPos.x, CONFIG.lerpFactor);
-    spherePos.y = lerp(spherePos.y, targetPos.y, CONFIG.lerpFactor);
-    spherePos.z = lerp(spherePos.z, targetPos.z, CONFIG.lerpFactor);
+    animationId = requestAnimationFrame(predict);
 
-    // Update sphere position
-    sphere.parent.position.set(spherePos.x, spherePos.y, spherePos.z);
+    const video = document.getElementById('video');
+    const nowInMs = Date.now();
 
-    // ===== SCALE: Apply LERP smoothing to pinch gesture =====
-    sphereScale = lerp(sphereScale, targetScale, CONFIG.lerpFactor);
-    sphere.parent.scale.set(sphereScale, sphereScale, sphereScale);
+    if (handLandmarker && video.readyState === video.HAVE_ENOUGH_DATA) {
+        const results = handLandmarker.detectForVideo(video, nowInMs);
 
-    // ===== OPACITY EFFECT: Energy field at large scales =====
-    // When sphere gets massive (scale > 8), reduce opacity for energy field look
-    if (overlayMaterial) {
-        if (sphereScale > 8) {
-            // Gradually reduce opacity as scale increases
-            const opacityFactor = Math.max(0.3, 1 - (sphereScale - 8) / 10);
-            overlayMaterial.opacity = opacityFactor;
+        if (results.landmarks && results.landmarks.length > 0) {
+            const thumb = results.landmarks[0][4];   // Thumb tip (landmark 4)
+            const index = results.landmarks[0][8];   // Index finger tip (landmark 8)
+
+            // Calculate distance between thumb and index finger
+            const dx = thumb.x - index.x;
+            const dy = thumb.y - index.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+
+            // Map coordinates to 3D world space
+            const targetX = (index.x - 0.5) * -12;
+            const targetY = (index.y - 0.5) * -10;
+
+            // ===== STATE 1: HAND CLOSED OR PARTIALLY OPEN (distance < threshold) =====
+            if (distance < CONFIG.fullyOpenThreshold) {
+                // Show sphere, hide celebration effects
+                sphere.visible = true;
+                targetEmojiOpacity = 0;
+                targetTextOpacity = 0;
+
+                // Scale sphere based on hand openness (distance * multiplier)
+                const targetScale = distance * CONFIG.scaleMultiplier;
+                sphere.parent.scale.lerp(new THREE.Vector3(targetScale, targetScale, targetScale), 0.1);
+
+                // Move sphere to follow index finger
+                sphere.parent.position.x += (targetX - sphere.parent.position.x) * 0.2;
+                sphere.parent.position.y += (targetY - sphere.parent.position.y) * 0.2;
+
+                handsDetected = 1;
+            }
+            // ===== STATE 2: HAND FULLY OPEN (distance >= threshold) =====
+            else {
+                // Hide sphere, show celebration effects
+                sphere.visible = false;
+                emojiGroup.visible = true;  // Explicitly show emoji group
+                targetEmojiOpacity = 1.0;
+                targetTextOpacity = 1.0;
+
+                // Get viewport dimensions for responsive boundaries
+                const vh = window.innerHeight / 2;  // Half-height for centered camera
+                const vw = window.innerWidth / 2;   // Half-width for centered viewport
+
+                // Update emoji sprites: falling motion and rotation
+                for (let spriteData of emojiSprites) {
+                    const sprite = spriteData.sprite;
+
+                    // Falling/floating motion
+                    sprite.position.y += spriteData.velocityY;
+                    sprite.position.x += spriteData.velocityX;
+
+                    // Rotation (use rotation.z for sprites)
+                    spriteData.rotation += spriteData.rotationSpeed;
+                    sprite.rotation.z = spriteData.rotation;
+
+                    // Reset sprite at top when it falls too low (based on viewport height)
+                    if (sprite.position.y < -vh) {
+                        sprite.position.y = vh;
+                        sprite.position.x = (Math.random() - 0.5) * (vw * 2);
+                    }
+
+                    // Reset sprite if it drifts outside horizontal bounds
+                    if (sprite.position.x < -vw * 1.5) {
+                        sprite.position.x = vw * 1.5;
+                    } else if (sprite.position.x > vw * 1.5) {
+                        sprite.position.x = -vw * 1.5;
+                    }
+                }
+
+                handsDetected = 1;
+                if (distance > CONFIG.fullyOpenThreshold + 0.05) {
+                    console.log('🎉 8 MARCH CELEBRATION! Hand fully open - distance:', distance.toFixed(3));
+                }
+            }
         } else {
-            // Normal opacity at smaller scales
-            overlayMaterial.opacity = 0.2;
+            handsDetected = 0;
+            targetEmojiOpacity = 0;
+            targetTextOpacity = 0;
         }
     }
 
-    // Update attached light position
-    if (pointLight) {
-        pointLight.position.copy(sphere.parent.position);
+    // ===== SMOOTH LERP TRANSITIONS FOR OPACITY =====
+    // Lerp emoji opacity
+    emojiOpacity = lerp(emojiOpacity, targetEmojiOpacity, CONFIG.lerpFactor);
+    if (emojiGroup) {
+        emojiGroup.visible = emojiOpacity > 0.01;
+        // Update opacity for all emoji sprites
+        for (let spriteData of emojiSprites) {
+            spriteData.sprite.material.opacity = emojiOpacity;
+        }
     }
 
-    // Update stats display
-    document.getElementById('stat-x').textContent = spherePos.x.toFixed(1);
-    document.getElementById('stat-y').textContent = spherePos.y.toFixed(1);
-    document.getElementById('stat-z').textContent = spherePos.z.toFixed(1);
-}
+    // Lerp text opacity and toggle display
+    textOpacity = lerp(textOpacity, targetTextOpacity, CONFIG.lerpFactor);
+    if (congratulationsText) {
+        congratulationsText.style.opacity = textOpacity.toString();
+        congratulationsText.style.display = textOpacity > 0.01 ? 'block' : 'none';
+    }
 
-/**
- * Update performance stats
- */
-function updateStats() {
+    // Update stats
     const now = Date.now();
     frameCount++;
-
     if (now - lastFrameTime >= 1000) {
         fps = frameCount;
         frameCount = 0;
@@ -389,49 +495,13 @@ function updateStats() {
 
     document.getElementById('stat-fps').textContent = fps;
     document.getElementById('stat-hands').textContent = handsDetected;
-}
 
-/**
- * Main render loop - continuous animation with hand detection
- */
-function render() {
-    if (!isRunning) return;
-
-    animationId = requestAnimationFrame(render);
-
-    const startTime = performance.now();
-
-    // ===== DETECT HANDS USING MODERN HANDLANDMARKER API =====
-    const video = document.getElementById('video');
-    
-    if (handLandmarker && video.readyState === video.HAVE_ENOUGH_DATA) {
-        // Get current timestamp for VIDEO running mode
-        const timestamp = performance.now();
-        
-        // Only process if enough time has passed (avoid redundant frames)
-        if (timestamp !== lastVideoTime) {
-            lastVideoTime = timestamp;
-            
-            try {
-                // Detect hand landmarks from video frame
-                const results = handLandmarker.detectForVideo(video, timestamp);
-                
-                // Process results
-                processHandResults(results);
-                
-            } catch (error) {
-                console.error('Hand detection error:', error);
-            }
-        }
+    // Update light to follow sphere
+    if (pointLight && sphere && sphere.parent) {
+        pointLight.position.copy(sphere.parent.position);
     }
 
-    // Update sphere with lerp smoothing
-    updateSphere();
-
-    // Update stats display
-    updateStats();
-
-    // Render 3D scene
+    // Render scene
     renderer.render(scene, camera);
 }
 
@@ -497,8 +567,8 @@ async function startTracking() {
         setStatus('Tracking active ✓', 'info');
         console.log('✓ Tracking started - watch the console for hand detection logs');
 
-        // Start render/animation loop
-        render();
+        // Start prediction/animation loop
+        predict();
 
     } catch (error) {
         console.error('✗ Start error:', error);
@@ -536,6 +606,19 @@ function stopTracking() {
         console.log('✓ Renderer cleaned up');
     }
 
+    // Clean up HTML text overlay
+    if (congratulationsText && congratulationsText.parentNode) {
+        congratulationsText.parentNode.removeChild(congratulationsText);
+        congratulationsText = null;
+        console.log('✓ Celebration text removed');
+    }
+
+    // Reset opacity states
+    emojiOpacity = 0;
+    textOpacity = 0;
+    targetEmojiOpacity = 0;
+    targetTextOpacity = 0;
+
     // Reset UI
     document.getElementById('start-btn').disabled = false;
     document.getElementById('stop-btn').style.display = 'none';
@@ -571,9 +654,6 @@ window.app = {
     renderer,
     isRunning,
     spherePos,
-    targetPos,
-    sphereScale,
-    targetScale,
     handLandmarker,
     CONFIG,
     // Helper functions
@@ -581,10 +661,7 @@ window.app = {
         handsDetected,
         lastConfidence,
         frameCounter,
-        spherePos,
-        targetPos,
-        sphereScale,
-        targetScale
+        spherePos
     })
 };
 
