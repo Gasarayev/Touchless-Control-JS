@@ -246,7 +246,7 @@ function initThreeJS() {
     // Create HTML-based celebration text overlay
     const textOverlay = document.createElement('div');
     textOverlay.id = 'celebration-text';
-    textOverlay.textContent = 'Bayramınız Mübarək!💖';
+    textOverlay.textContent = 'Bayramın Mübarək💖';
     document.body.appendChild(textOverlay);
     congratulationsText = textOverlay;
 
